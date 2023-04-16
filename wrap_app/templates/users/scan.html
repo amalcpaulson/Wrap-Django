@@ -62,6 +62,20 @@
         background: white;
         color: #009743;
     }
+
+    #webcam-container>canvas {
+        width: 100%;
+        height: 100%;
+    }
+
+    .scanner-wrapper {
+        position: relative;
+    }
+
+    #label-container {
+        position: absolute;
+        bottom: 0;
+    }
 </style>
 {% endblock %} {% block content %}
 <div class="scan-wrapper">
@@ -69,17 +83,18 @@
     height: 100vh;">
         <img src="../../static/images/scan/scan-image.jpg" alt="">
         <div class="foreground-image">
-            <div>
+            <div class="scanner-wrapper">
                 <img src="../../static/images/scan/scan-black-border.png" alt="">
+                <div id="webcam-container" style="width: 100%;height: 100%;"></div>
+                <div id="label-container" style="color:aliceblue"></div>
                 <img src="../../static/images/scan/scan-white-border.png" alt="">
             </div>
             <div class="scan-buttons">
-                <button type="button" onclick="init()">Snap</button>
-                <button>Next</button>
+                <button type="button" onclick="init(event)">open cam</button>
+                <button onclick="snapfunction()">Snap</button>
 
             </div>
-            <div id="webcam-container"></div>
-            <div id="label-container"></div>
+
         </div>
     </div>
 </div>
@@ -88,6 +103,7 @@
 
 
 {% block script %}
+
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 <script type="text/javascript">
@@ -95,12 +111,21 @@
     // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
 
     // the link to your model provided by Teachable Machine export panel
-    const URL = "https://teachablemachine.withgoogle.com/models/Fa4rA2jkX/";
+    const URL = "https://teachablemachine.withgoogle.com/models/X4A-hIZiG/";
 
     let model, webcam, labelContainer, maxPredictions;
 
+    let id;
+    let id2;
+    const snapfunction = () => {
+        window.cancelAnimationFrame(id);
+        window.cancelAnimationFrame(id2);
+
+    }
     // Load the image model and setup the webcam
-    async function init() {
+    async function init(e) {
+        e.target.style.display = "none"
+
         const modelURL = URL + "model.json";
         const metadataURL = URL + "metadata.json";
 
@@ -110,39 +135,46 @@
         // Note: the pose library adds "tmImage" object to your window (window.tmImage)
         model = await tmImage.load(modelURL, metadataURL);
         maxPredictions = model.getTotalClasses();
+        console.log(maxPredictions)
 
         // Convenience function to setup a webcam
         const flip = true; // whether to flip the webcam
         webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
         await webcam.setup(); // request access to the webcam
         await webcam.play();
-        window.requestAnimationFrame(loop);
+        id = window.requestAnimationFrame(loop);
+        console.log("this is id ", id)
 
         // append elements to the DOM
         document.getElementById("webcam-container").appendChild(webcam.canvas);
         labelContainer = document.getElementById("label-container");
         for (let i = 0; i < maxPredictions; i++) { // and class labels
             labelContainer.appendChild(document.createElement("div"));
+            console.log(i)
         }
     }
 
     async function loop() {
         webcam.update(); // update the webcam frame
         await predict();
-        window.requestAnimationFrame(loop);
+        id2 = window.requestAnimationFrame(loop);
     }
 
     // run the webcam image through the image model
     async function predict() {
+        let min;
         // predict can take in an image, video or canvas html element
         const prediction = await model.predict(webcam.canvas);
+        min = 0
         for (let i = 0; i < maxPredictions; i++) {
-            const classPrediction =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-            labelContainer.childNodes[i].innerHTML = classPrediction;
+            if (prediction[min].probability < prediction[i].probability) {
+                min = i;
+            }
         }
+        let predicted = `${prediction[min].className} : ${prediction[min].probability.toFixed(2) * 100}`
+        labelContainer.childNodes[0].innerHTML = predicted
+        // console.log(predicted)
     }
 </script>
-
 
 {% endblock %}
